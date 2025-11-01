@@ -1,11 +1,13 @@
 import streamlit as st
 import os
+import sys
 import json
 from typing import List, Dict, Optional, Tuple
 import requests
 from dotenv import load_dotenv
 from math import radians, sin, cos, sqrt, atan2
 import urllib
+from graph.pipeline_graph import run_once
 
 # ============================================================================
 # 설정 및 상수
@@ -16,7 +18,11 @@ load_dotenv()
 KAKAO_REST_KEY = os.getenv("KAKAO_REST_KEY")
 KAKAO_API_KEY = os.getenv("KAKAO_API_KEY")
 HEADERS = {"Authorization": f"KakaoAK {KAKAO_REST_KEY}"}
-ALLOWED_REGION = ["강남구", "서초구", "송파구"]
+ALLOWED_REGION_TO_PLACE = {
+            "강남구": "gangnam",
+            "서초구": "seocho",
+            "송파구": "songpa"
+        }
 
 LIBRARY_ADDRESS_MAP = {
     "도곡정보문화도서관": "서울특별시 강남구 도곡로18길 57",
@@ -732,27 +738,26 @@ if ("address" in st.session_state and "book_name" in st.session_state and
         
         user_lng, user_lat, user_region = user_coords
 
-        if user_region not in ALLOWED_REGION:
+        # 실제 도서관 검색 실행 (pipeline_graph 연동)
+        sys.path.insert(0, "00_src")
+
+        place = ALLOWED_REGION_TO_PLACE.get(user_region)
+
+        if not place:
             st.warning("😥 입력하신 지역의 서비스는 아직 준비 중입니다. 강남구, 서초구, 송파구 내에서 검색해주세요.")
             st.stop()
 
-        jsonl_data = """
-            {"title": "도서 (큰글자책) 숨결이 바람 될 때", "library": "행복한도서관", "status_raw": "대출가능", "available": true, "room": "[행복한] 큰글자책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 숨결이 바람 될 때", "library": "행복한도서관", "status_raw": "대출가능", "available": true, "room": "[행복한] 큰글자책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 [큰글자도서] 숨결이 바람 될 때", "library": "논현도서관", "status_raw": "대출가능", "available": true, "room": "[큰글자도서] 숨결이", "call_number": "큰", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 숨결이 바람 될 때", "library": "논현도서관", "status_raw": "대출불가", "available": false, "room": "[큰글자도서] 숨결이", "call_number": "큰", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 (큰글씨책) 숨결이 바람 될 때", "library": "대치도서관", "status_raw": "대출불가", "available": false, "room": "[대치] 큰글씨책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 숨결이 바람 될 때", "library": "대치도서관", "status_raw": "status_raw": "대출가능", "available": true, "[대치] 큰글씨책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 WHEN BREATH BECOMES", "library": "일원본동주민도서관", "status_raw": "status_raw": "대출가능", "available": true, "room": "[일원본동문고] 일반자료실", "call_number": "848-폴872w", "year": "2016", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}"""
-        
-        jsonl_data_unavailable = """
-            {"title": "도서 (큰글자책) 숨결이 바람 될 때", "library": "행복한도서관", "status_raw": "대출불가", "available": false, "room": "[행복한] 큰글자책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 [큰글자도서] 숨결이 바람 될 때", "library": "논현도서관", "status_raw": "대출불가", "available": false, "room": "[큰글자도서] 숨결이", "call_number": "큰", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 숨결이 바람 될 때", "library": "논현도서관", "status_raw": "대출불가", "available": false, "room": "[큰글자도서] 숨결이", "call_number": "큰", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 (큰글씨책) 숨결이 바람 될 때", "library": "대치도서관", "status_raw": "대출불가", "available": false, "room": "[대치] 큰글씨책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 숨결이 바람 될 때", "library": "대치도서관", "status_raw": "status_raw": "대출불가", "available": false, "[대치] 큰글씨책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
-            {"title": "도서 WHEN BREATH BECOMES", "library": "일원본동주민도서관", "status_raw": "status_raw": "대출불가", "available": false, "room": "[일원본동문고] 일반자료실", "call_number": "848-폴872w", "year": "2016", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}"""
-        
+        # LangGraph 파이프라인 실행 (브라우저 자동화 + HTML 파싱)
+        result = run_once(place=place, title=st.session_state["book_name"])
+        # JSONL 데이터 추출
+        jsonl_path = result.get("out_jsonl")
+        if jsonl_path and os.path.exists(jsonl_path):
+            with open(jsonl_path, "r", encoding="utf-8") as f:
+                jsonl_data = f.read()
+        else:
+            st.error(":x: 도서관 검색에 실패했습니다. 다시 시도해주세요.")
+            st.stop()
+
         map_libraries, all_libraries, first_cover_image = process_book_results(
             jsonl_data, user_lat, user_lng
         )
