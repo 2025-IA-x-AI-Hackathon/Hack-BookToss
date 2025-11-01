@@ -835,6 +835,7 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                         else:
                             st.markdown(f"""
                             <div style="display:flex; align-items:flex-start; gap:0.8rem; margin-bottom:0.8rem;">
+                                <div>
                                     <div style="font-weight:bold; font-size:1.2rem;">{book['title']}</div>
                                     <div style="margin-top:0.3rem;">· 자료실: {book.get('room', 'N/A')}</div>
                                     <div>· 청구기호: {book.get('call_number', 'N/A')}</div>
@@ -842,11 +843,12 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                             </div>
                             """, unsafe_allow_html=True)
                 st.write("")
-show_library_search_button(st.session_state["book_name"], user_region)
-# 푸터 안내
-st.markdown("---")
-st.markdown("""
-<div style="text-align:center; color:#999; font-size:0.9rem; padding:1rem 0;">
-    💡 <b>TIP:</b> 지도의 도서관 마커를 클릭하면 상세 정보를 확인할 수 있어요
-</div>
-""", unsafe_allow_html=True)
+        show_library_search_button(st.session_state["book_name"], user_region)
+
+        # 푸터 안내
+        st.markdown("---")
+        st.markdown("""
+        <div style="text-align:center; color:#999; font-size:0.9rem; padding:1rem 0;">
+            💡 <b>TIP:</b> 지도의 도서관 마커를 클릭하면 상세 정보를 확인할 수 있어요
+        </div>
+        """, unsafe_allow_html=True)
