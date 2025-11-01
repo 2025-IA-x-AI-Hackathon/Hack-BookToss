@@ -631,6 +631,26 @@ def generate_map_html(user_lat: float, user_lng: float,
     </html>
     """
 
+def show_library_search_button(book_name: str, user_region: str):
+    """지역별 도서관 검색 버튼을 표시"""
+    encoded_book = urllib.parse.quote(book_name)
+
+    library_urls = {
+        "강남구": f"https://library.gangnam.go.kr/intro/menu/10003/program/30001/plusSearchResultList.do?searchType=SIMPLE&searchMenuCollectionCategory=&searchCategory=ALL&searchKey=ALL&searchKeyword={encoded_book}&searchLibrary=ALL",
+        "서초구": f"https://public.seocholib.or.kr/KeywordSearchResult/{encoded_book}",
+        "송파구": f"https://www.splib.or.kr/intro/menu/10003/program/30001/plusSearchSimple.do"
+    }
+
+    # 현재 지역에 맞는 URL 찾기
+    for region, url in library_urls.items():
+        if region.startswith(user_region):
+            st.link_button(
+                f"🔗 {region} 통합도서관에서 직접 검색하기",
+                url,
+                use_container_width=True
+            )
+            break  # 찾으면 반복 종료
+
 # ============================================================================
 # UI 렌더링
 # ============================================================================
@@ -714,20 +734,7 @@ if ("address" in st.session_state and "book_name" in st.session_state and
 
         if not all_libraries:
             st.warning("⚠️ 현재 대출 가능한 도서관을 찾을 수 없습니다.")
-
-            encoded_book = urllib.parse.quote(st.session_state['book_name'])
-            library_urls = {
-                "강남구": f"https://library.gangnam.go.kr/intro/menu/10003/program/30001/plusSearchResultList.do?searchType=SIMPLE&searchMenuCollectionCategory=&searchCategory=ALL&searchKey=ALL&searchKeyword={encoded_book}&searchLibrary=ALL",
-                "서초구": f"https://public.seocholib.or.kr/KeywordSearchResult/{encoded_book}",
-                "송파구": f"https://www.splib.or.kr/intro/menu/10003/program/30001/plusSearchSimple.do"
-            }
-
-            key = f"{user_region}"
-            for k, url in library_urls.items():
-                if k.startswith(key):
-                    st.link_button(f"🔗 {user_region}통합도서관에서 직접 검색하기",f"{url}", use_container_width=True)
-
-
+            show_library_search_button(st.session_state["book_name"], user_region)
             st.stop()
 
         # 결과 카드
@@ -817,7 +824,7 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                             </div>
                             """, unsafe_allow_html=True)
                 st.write("")
-
+show_library_search_button(st.session_state["book_name"], user_region)
 # 푸터 안내
 st.markdown("---")
 st.markdown("""
