@@ -30,6 +30,7 @@ st.set_page_config(
 )
 
 def calculate_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """두 좌표 간 거리 계산 (Haversine 공식, km 단위)"""
     R = 6371  # 지구 반지름 (km)
 
     lat1, lng1, lat2, lng2 = map(radians, [lat1, lng1, lat2, lng2])
@@ -63,6 +64,7 @@ def format_distance(route_distance_m: Optional[float], fallback_distance_km: flo
 
 
 def parse_jsonl(jsonl_text: str) -> List[Dict]:
+    """JSONL 텍스트를 파싱"""
     results = []
     for line in jsonl_text.strip().split('\n'):
         if line.strip():
@@ -74,6 +76,7 @@ def parse_jsonl(jsonl_text: str) -> List[Dict]:
 
 
 def get_coordinates(address: str) -> Optional[Tuple[float, float, str]]:
+    """주소를 좌표로 변환"""
     try:
         url = "https://dapi.kakao.com/v2/local/search/address.json"
         params = {"query": address}
@@ -100,6 +103,7 @@ def get_coordinates(address: str) -> Optional[Tuple[float, float, str]]:
         return None
 
 def get_library_with_distance(library_name: str, user_lat: float, user_lng: float) -> Optional[Dict]:
+    """도서관 정보 및 거리 계산"""
     if library_name not in LIBRARY_ADDRESS_MAP:
         return None
     
