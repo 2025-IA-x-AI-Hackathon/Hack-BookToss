@@ -813,9 +813,6 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                         길찾기
                         </a>
                     </p>
-                    <div style="margin-top:0.3rem; color:#4a5568; font-size:0.9rem;">
-                        🚘 {duration_text} · 📏 {distance_text}
-                    </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
