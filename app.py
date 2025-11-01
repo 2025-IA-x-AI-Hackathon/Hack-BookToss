@@ -807,7 +807,7 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                 <div class="library-item {status_class}">
                     <h4>
                         {'🥇' if idx == 0 else '🥈' if idx == 1 else ''} {lib['name']}
-                        <span class="distance-badge">{distance_badge}</span>
+                        <span class="distance-badge">차로 {distance_badge}</span>
                     </h4>
                     <p style="margin:0 0; display:flex; align-items:center; gap:0.4rem;">
                         <span style="flex:0 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
