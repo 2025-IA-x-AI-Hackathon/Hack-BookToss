@@ -281,7 +281,10 @@ def get_coordinates(address: str) -> Optional[Tuple[float, float, str]]:
         doc = documents[0]
         lng = float(doc["x"])
         lat = float(doc["y"])
-        region = doc["address"].get("region_2depth_name", "")
+        if doc.get("address") is not None:
+            region = doc["address"].get("region_2depth_name", "")
+        else:
+            region = doc.get("road_address", {}).get("region_2depth_name", "")
         
         if not region:
             return None
