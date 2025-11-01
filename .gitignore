@@ -57,6 +57,7 @@ cookies.json
 credentials.json
 token.json
 gcp-login.json
+*.mdc
 
 # ============================================================================
 # Generated Files (제외할 파일들)
