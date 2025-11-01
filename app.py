@@ -628,7 +628,7 @@ def generate_map_html(user_lat: float, user_lng: float,
         </script>
     </head>
     <body style="margin:0px">
-        <div id="map" style="width:100%;height:550px;border-radius:15px;"></div>
+        <div id="map" style="width:100%;height:550px;border-radius:10px;"></div>
         <script>
             var mapContainer = document.getElementById('map');
             var mapOption = {{
@@ -636,6 +636,8 @@ def generate_map_html(user_lat: float, user_lng: float,
                 level: 6
             }};
             var map = new kakao.maps.Map(mapContainer, mapOption);
+            var zoomControl = new kakao.maps.ZoomControl();
+            map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
             var bounds = new kakao.maps.LatLngBounds();
             {markers_js}
             
