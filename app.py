@@ -7,7 +7,6 @@ import requests
 from dotenv import load_dotenv
 from math import radians, sin, cos, sqrt, atan2
 import urllib
-from graph.pipeline_graph import run_once
 
 # ============================================================================
 # 설정 및 상수
@@ -740,6 +739,7 @@ if ("address" in st.session_state and "book_name" in st.session_state and
 
         # 실제 도서관 검색 실행 (pipeline_graph 연동)
         sys.path.insert(0, "00_src")
+        from graph.pipeline_graph import run_once
 
         place = ALLOWED_REGION_TO_PLACE.get(user_region)
 
