@@ -1,0 +1,12 @@
+# 도서관 카탈로그 인덱스. 우선은 강남 3구 공공 도서관으로 시작.
+gangnam:
+  homepage: "https://library.gangnam.go.kr"
+  note: "강남구 통합도서관"
+
+seocho:
+  homepage: "https://public.seocholib.or.kr"
+  note: "서초구립도서관"
+
+songpa:
+  homepage: "https://www.splib.or.kr"
+  note: "송파구 통합도서관"
