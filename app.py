@@ -173,8 +173,6 @@ def generate_map_html(user_lat: float, user_lng: float,
                 <div class="body">
                     <div class="desc">
                         <div class="ellipsis">📍 {lib['address']}</div>
-                        <div>⏱️ 이동시간: {duration_text}</div>
-                        <div>📏 이동거리: {distance_text}</div>
                         <div>⤴️ <a href='https://map.kakao.com/link/from/내위치,{user_lat},{user_lng}/to/{lib['name']},{lib['lat']},{lib['lng']}' target='_blank' class='link'>길찾기</a></div>
                     </div>
                 </div>
@@ -287,9 +285,17 @@ if ("address" in st.session_state and "book_name" in st.session_state and
     with st.spinner("🔍 도서관 검색 중..."):
         # 사용자 위치 좌표 가져오기
         user_coords = get_coordinates(st.session_state["address"])
-
-        user_lng, user_lat, user_region = user_coords
         
+        if not user_coords:
+            st.error("❌ 입력하신 주소를 찾을 수 없거나 주소 정보가 부족합니다. 주소를 다시 확인해주세요.")
+            st.stop()
+        
+        user_lng, user_lat, user_region = user_coords
+
+        if user_region not in ALLOWED_REGION:
+            st.warning("😥 입력하신 지역의 서비스는 아직 준비 중입니다. 강남구, 서초구, 송파구 내에서 검색해주세요.")
+            st.stop()
+
         jsonl_data = """
             {"title": "도서 (큰글자책) 숨결이 바람 될 때", "library": "행복한도서관", "status_raw": "대출가능", "available": true, "room": "[행복한] 큰글자책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
             {"title": "도서 [큰글자도서] 숨결이 바람 될 때", "library": "논현도서관", "status_raw": "대출가능", "available": true, "room": "[큰글자도서] 숨결이", "call_number": "큰", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
@@ -302,6 +308,20 @@ if ("address" in st.session_state and "book_name" in st.session_state and
 
         if not all_libraries:
             st.warning("⚠️ 현재 대출 가능한 도서관을 찾을 수 없습니다.")
+
+            encoded_book = urllib.parse.quote(st.session_state['book_name'])
+            library_urls = {
+                "강남구": f"https://library.gangnam.go.kr/intro/menu/10003/program/30001/plusSearchResultList.do?searchType=SIMPLE&searchMenuCollectionCategory=&searchCategory=ALL&searchKey=ALL&searchKeyword={encoded_book}&searchLibrary=ALL",
+                "서초구": f"https://public.seocholib.or.kr/KeywordSearchResult/{encoded_book}",
+                "송파구": f"https://www.splib.or.kr/intro/menu/10003/program/30001/plusSearchSimple.do"
+            }
+
+            key = f"{user_region}"
+            for k, url in library_urls.items():
+                if k.startswith(key):
+                    st.link_button(f"🔗 {user_region}통합도서관에서 직접 검색하기",f"{url}", use_container_width=True)
+
+
             st.stop()
 
         # 결과 카드
