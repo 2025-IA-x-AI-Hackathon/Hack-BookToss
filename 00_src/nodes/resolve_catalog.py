@@ -6,9 +6,6 @@ resolve_catalog.py
 동작: catalog_index.yaml에서 place에 맞는 홈페이지 URL을 찾는다. (LLM 사용 X)
 출력: {"place": <입력>, "catalog_home_url": <str|None>, "found": <bool>}
 
-설계 메모
-- selector_hint, simple_search_path 같은 세부 셀렉터는 지금 단계에서 다루지 않는다.
-- URL만 확실히 제공하고, 이후 노드(ingest)가 자동 탐색/JS로 검색을 수행한다.
 """
 
 from __future__ import annotations
