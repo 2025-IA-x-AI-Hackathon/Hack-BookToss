@@ -131,6 +131,13 @@ def process_book_results(jsonl_data: str, user_lat: float, user_lng: float) -> T
 
 def generate_map_html(user_lat: float, user_lng: float, 
                      library_coords: List[Dict], book_name: str) -> str:
+    """카카오맵 HTML 생성"""
+
+    user_html = f"""
+        <div class="user"">
+            <div>내 위치</div>
+        </div>
+        """
 
     markers_js = f"""
         var userLatLng = new kakao.maps.LatLng({user_lat}, {user_lng});
@@ -143,9 +150,38 @@ def generate_map_html(user_lat: float, user_lng: float,
             )
         }});
         bounds.extend(userLatLng);
+
+        var userOverlay = new kakao.maps.CustomOverlay({{
+            content: `{user_html}`,
+            map: null,
+            position: userMarker.getPosition()
+        }});
+
+        userOverlay.setMap(map);
+        
+        var overlays = [];
     """
     
     for idx, lib in enumerate(library_coords):
+        info_html = f"""
+        <div class="wrap">
+            <div class="info">
+                <div class="title">
+                    {lib['name']}
+                    <div class="close" onclick="closeOverlay({idx})" title="닫기"></div>
+                </div>
+                <div class="body">
+                    <div class="desc">
+                        <div class="ellipsis">📍 {lib['address']}</div>
+                        <div>⏱️ 이동시간: {duration_text}</div>
+                        <div>📏 이동거리: {distance_text}</div>
+                        <div>⤴️ <a href='https://map.kakao.com/link/from/내위치,{user_lat},{user_lng}/to/{lib['name']},{lib['lat']},{lib['lng']}' target='_blank' class='link'>길찾기</a></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """
+
         markers_js += f"""
             (function(index) {{
                 var libLatLng = new kakao.maps.LatLng({lib['lat']}, {lib['lng']});
@@ -153,6 +189,19 @@ def generate_map_html(user_lat: float, user_lng: float,
                     position: libLatLng,
                     map: map
                 }});
+
+                var overlay = new kakao.maps.CustomOverlay({{
+                    content: `{info_html}`,
+                    map: null,
+                    position: marker.getPosition()
+                }});
+                
+                overlays[index] = overlay;
+                
+                kakao.maps.event.addListener(marker, 'click', function() {{
+                    overlay.setMap(map);
+                }});
+                
                 bounds.extend(libLatLng);
             }})({idx});
         """
@@ -279,7 +328,7 @@ if ("address" in st.session_state and "book_name" in st.session_state and
             is_top = idx < TOP_N_MAP
             status_class = "available" if is_top else ""
             distance_text = lib.get("straight_distance", lib["straight_distance"])
-            
+
             with st.container():
                 st.markdown(f"""
                 <div class="library-item {status_class}">
