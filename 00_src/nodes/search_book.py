@@ -1,18 +1,11 @@
-"""
-search_book.py
---------------
-브라우저 자동화로 도서관 사이트에서 책 검색 수행 (단계 1: 단일 페이지)
-
-입력: state(dict) - catalog_home_url, title 포함
-동작: browser-use를 사용해 도서관 사이트에서 검색하고 첫 페이지 HTML 저장
-출력: state에 saved_html_path 추가
-"""
+# search_book.py
 
 from __future__ import annotations
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import urllib.parse as _urlparse  # 도메인 추출용
 from datetime import datetime
+from pathlib import Path
 
 # Agent 모드용 라이브러리 (로컬 브라우저 직접 제어)
 try:
@@ -28,6 +21,13 @@ try:
     load_dotenv()
 except Exception:
     pass
+
+try:
+    from browser_use_sdk import BrowserUseClient  # type: ignore
+except Exception:
+    BrowserUseClient = None  # 런타임에 미설치면 '실행 계획'만 반환하여 디버깅 가능
+
+SELECTORS_PATH = "00_src/configs/selectors.yaml"
 
 # Quick SPA readiness keywords for Korean library sites
 SPA_READY_KEYWORDS = ["검색결과", "소장", "대출", "상세보기"]
@@ -45,23 +45,16 @@ def _build_browser_use_task(catalog_home_url: str, title: str) -> str:
 """
 
 def search_book(state: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    도서관 사이트에서 책을 검색하고 첫 페이지 HTML을 저장합니다.
-    
-    Args:
-        state: 상태 딕셔너리 (catalog_home_url, title, place 포함)
-        
-    Returns:
-        업데이트된 state 딕셔너리 (saved_html_path, page_url 등 추가)
-    """
+    """도서관 홈 이동 + 초간단 검색(게이트드 LLM). 캡처는 하지 않음."""
     # 핵심 입력
     home = str(state.get("catalog_home_url", "")).strip()
     title = str(state.get("title", "")).strip()
     place = str(state.get("place", "")).strip()
     if not place:
+        # fallback: try to infer later from saved filename; still keep non-empty token for downstream
         place = state["place"] = "unknown"
     if not home or not title:
-        return {**state, "ok": False, "search_error": "catalog_home_url 또는 title이 없습니다", "page_url": None}
+        return {**state, "ok": False, "result_hint": "invalid_input", "page_url": None}
 
     # 텔레메트리 비활성(불필요 백오프 방지) - 모든 변수 강제 설정
     os.environ["POSTHOG_DISABLED"] = "1"
@@ -106,19 +99,20 @@ def search_book(state: Dict[str, Any]) -> Dict[str, Any]:
 
     # LLM (소형 모델)
     if Agent is None or ChatOpenAI is None:
-        return {**state, "ok": False, "search_error": "browser_use Agent 미설치", "page_url": None}
-    
-    llm = ChatOpenAI(model=state.get("llm_model", "gpt-4o-mini"))
+        # 라이브러리 미설치 시 계획만 반환
+        task_preview = _build_browser_use_task(home, title)  # , {}, [30, 60, 90] - 제거됨
+        return {**state, "ok": False, "result_hint": "plan_only", "page_url": None, "log": ["browser_use Agent 미설치"], "task_prompt": task_preview}
+    llm = ChatOpenAI(model=state.get("llm_model", "gpt-5-mini"))
 
-    # Agent 태스크 생성
-    task = _build_browser_use_task(home, title)
-    agent = Agent(task=task, llm=llm, browser=browser) if browser else Agent(task=task, llm=llm)
+    # 1단계: 규칙 기반(아주 짧은 태스크, max_steps=8)
+    task_rules = _build_browser_use_task(home, title)  # , {}, [30, 60, 90] - 제거됨
+    agent_rules = Agent(task=task_rules, llm=llm, browser=browser) if browser else Agent(task=task_rules, llm=llm)
 
     import asyncio
     try:
-        # asyncio 내에서 검색 실행 및 HTML 추출
+        # asyncio 내에서 CDP/URL/HTML 추출하는 함수
         async def run_and_extract():
-            history = await agent.run(max_steps=int(state.get("max_steps", 8)))
+            history = await agent_rules.run(max_steps=int(state.get("max_steps_rules", 8)))
             
             # SPA 로딩 완료 대기: 네트워크 아이들 + 본문 키워드 등장 대기(최대 10s)
             try:
@@ -152,17 +146,10 @@ def search_book(state: Dict[str, Any]) -> Dict[str, Any]:
                 print(f"[search_book] 검색 결과 데이터 로딩 대기 중... (5초)")
                 await asyncio.sleep(5)
             
-            # CDP endpoint & page_url 추출
+            # page_url 추출
             page_url = None
-            cdp = None
             
             if browser:
-                try:
-                    cdp = browser.cdp_url
-                    print(f"[search_book] CDP: {cdp}")
-                except Exception as e:
-                    print(f"[search_book] CDP 추출 실패: {e}")
-                
                 try:
                     page_url = await browser.get_current_page_url()
                     print(f"[search_book] URL: {page_url}")
@@ -204,8 +191,7 @@ def search_book(state: Dict[str, Any]) -> Dict[str, Any]:
                             meta = {
                                 "place": place,
                                 "page_url": page_url,
-                                "captured_at": datetime.now().isoformat(timespec="seconds"),
-                                "cdp_endpoint": cdp
+                                "captured_at": datetime.now().isoformat(timespec="seconds")
                             }
                             with open(saved_path + ".meta.json", "w", encoding="utf-8") as mf:
                                 import json as _json
@@ -214,7 +200,7 @@ def search_book(state: Dict[str, Any]) -> Dict[str, Any]:
                             print(f"[search_book] 메타 저장 경고: {_e}")
                         
                         html_size = len(html_content)
-                        print(f"[search_book] ✅ HTML 저장 완료: {saved_path} ({html_size:,} bytes)")
+                        print(f"[search_book] ✅ HTML 저장 완료 (페이지 1): {saved_path} ({html_size:,} bytes)")
                     else:
                         print(f"[search_book] ⚠️ HTML 내용이 비어있음")
                         
@@ -223,36 +209,267 @@ def search_book(state: Dict[str, Any]) -> Dict[str, Any]:
                     import traceback
                     traceback.print_exc()
             
+            # ========== 다중 페이지 처리: JavaScript 직접 실행으로 마지막 페이지까지 ==========
+            saved_html_paths = [saved_path]  # 1페이지 경로 저장
+            
+            # 공통 변수 준비
+            today = datetime.now().strftime("%Y-%m-%d")
+            base_timestamp = int(datetime.now().timestamp())
+            dir_path = Path(f"00_src/data/raw/{today}")
+            
+            if browser:
+                current_page = 1
+                max_pages = 10  # 안전장치 (무한 루프 방지) 최대 10페이지까지만 저장함.
+                
+                while current_page < max_pages:
+                    try:
+                        next_page_num = current_page + 1
+                        print(f"[search_book] 🔍 {next_page_num}페이지 버튼 찾는 중...")
+                        
+                        # JavaScript로 다음 페이지 버튼 클릭 (다중 패턴 지원)
+                        js_code = f"""
+(function() {{
+    // 패턴 1: 송파구 스타일 - javascript:fnList(N)
+    let link = document.querySelector('a[href*="fnList({next_page_num})"]');
+    if (link) {{
+        link.click();
+        return 'clicked_fnList';
+    }}
+    
+    // 패턴 2: 강남구 스타일 - button.pgNum
+    let pgNumButtons = document.querySelectorAll('button.pgNum');
+    for (let btn of pgNumButtons) {{
+        if (btn.textContent.trim() === '{next_page_num}') {{
+            btn.click();
+            return 'clicked_pgNum';
+        }}
+    }}
+    
+    // 패턴 3: 서초구 스타일 - button with @click
+    let allButtons = document.querySelectorAll('button');
+    for (let btn of allButtons) {{
+        if (btn.textContent.trim() === '{next_page_num}') {{
+            btn.click();
+            return 'clicked_button';
+        }}
+    }}
+    
+    // 패턴 4: 일반 링크 (텍스트가 N인 모든 <a> 태그)
+    let allLinks = document.querySelectorAll('a');
+    for (let a of allLinks) {{
+        if (a.textContent.trim() === '{next_page_num}' && a.href.includes('javascript')) {{
+            a.click();
+            return 'clicked_link';
+        }}
+    }}
+    
+    return 'not_found';
+}})()
+"""
+                        
+                        # JavaScript 실행
+                        result = await browser.cdp_client.send.Runtime.evaluate(
+                            params={
+                                "expression": js_code,
+                                "returnByValue": True
+                            },
+                            session_id=browser.agent_focus.session_id
+                        )
+                        
+                        click_result = result.get("result", {}).get("value", "not_found")
+                        clicked = click_result != "not_found"
+                        
+                        print(f"[search_book] {'✅' if clicked else '📍'} {next_page_num}페이지 클릭 결과: {click_result}")
+                        
+                        if not clicked:
+                            # 다음 버튼 없음 → 마지막 페이지 도달
+                            print(f"[search_book] 📍 마지막 페이지 도달 (현재: {current_page}페이지)")
+                            break
+                        
+                        current_page = next_page_num
+                        
+                        # 페이지 로딩 대기 (SPA 사이트를 위해 충분한 시간 확보)
+                        print(f"[search_book] {current_page}페이지 로딩 대기 중... (7초)")
+                        await asyncio.sleep(7)
+                        
+                        # HTML 추출
+                        print(f"[search_book] {current_page}페이지 HTML 추출 중...")
+                        page_html = await browser.cdp_client.send.Runtime.evaluate(
+                            params={
+                                "expression": "document.documentElement.outerHTML",
+                                "returnByValue": True
+                            },
+                            session_id=browser.agent_focus.session_id
+                        )
+                        page_html_content = page_html.get("result", {}).get("value", "")
+                        
+                        if page_html_content and len(page_html_content) > 1000:
+                            # 파일명 생성
+                            page_filename = f"{place}_{base_timestamp}_results_page{current_page}.html"
+                            page_path = dir_path / page_filename
+                            
+                            # HTML 저장
+                            page_path.write_text(page_html_content, encoding="utf-8")
+                            page_size = len(page_html_content)
+                            print(f"[search_book] ✅ {current_page}페이지 HTML 저장 완료: {page_path} ({page_size:,} bytes)")
+                            
+                            saved_html_paths.append(str(page_path))
+                        else:
+                            print(f"[search_book] ⚠️ {current_page}페이지 HTML 추출 실패 또는 내용 부족")
+                            break  # HTML 추출 실패하면 중단
+                        
+                    except Exception as e:
+                        print(f"[search_book] ⚠️ {current_page}페이지 처리 실패: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        break  # 에러 발생 시 중단
+            
             # 브라우저 종료 (async 컨텍스트 내부에서)
             if browser:
                 try:
                     print(f"[search_book] 브라우저 종료 중...")
-                    await browser.stop()
+                    await browser.stop()  # BrowserSession은 close() 대신 stop() 사용
                     print(f"[search_book] ✅ 브라우저 종료 완료")
                 except Exception as e:
                     print(f"[search_book] ⚠️ 브라우저 종료 경고: {e}")
             
-            return history, page_url, cdp, saved_path, html_size
+            return history, page_url, saved_html_paths, html_size
         
         # asyncio 실행
-        history, page_url, cdp_endpoint, saved_html_path, html_size = asyncio.run(run_and_extract())
+        history1, page_url, saved_html_paths, html_size = asyncio.run(run_and_extract())
+        
+        total_pages = len(saved_html_paths)
+        print(f"[search_book] 📊 총 {total_pages}개 페이지 HTML 저장 완료")
         
         return {
             **state, 
             "ok": True, 
+            "result_hint": "results_detected", 
             "page_url": page_url, 
-            "cdp_endpoint": cdp_endpoint, 
-            "saved_html_path": saved_html_path,
-            "html_size": html_size,
+            "saved_html_path": saved_html_paths[0] if saved_html_paths else None,  # 1페이지 경로 (하위 호환)
+            "saved_html_paths": saved_html_paths,  # 전체 페이지 경로 리스트
+            "total_pages": total_pages,
+            "html_size": html_size, 
+            "used_frame": None, 
+            "markers": [], 
+            "log": [f"rules_steps={len(history1) if isinstance(history1, list) else 'unknown'}"], 
             "place": place
         }
-    except Exception as e:
-        print(f"[search_book] ❌ 검색 실패: {e}")
-        import traceback
-        traceback.print_exc()
-        return {
-            **state, 
-            "ok": False, 
-            "search_error": str(e),
-            "page_url": None
-        }
+    except Exception as e1:
+        # 2단계: 유연 태스크(한 번만), max_steps=15
+        task_llm = f"수정된 시도: 위와 동일하지만 다른 경로도 허용. 실패 시 즉시 종료.\n" + _build_browser_use_task(home, title)  # , {}, [30, 60, 90] - 제거됨
+        agent_llm = Agent(task=task_llm, llm=llm, browser=browser) if browser else Agent(task=task_llm, llm=llm)
+        try:
+            # asyncio 내에서 CDP/URL/HTML 추출하는 함수 (LLM 경로)
+            async def run_and_extract_llm():
+                history = await agent_llm.run(max_steps=int(state.get("max_steps_llm", 15)))
+                
+                # SPA 로딩 완료 대기: 네트워크 아이들 + 본문 키워드 등장 대기(최대 10s)
+                try:
+                    await browser.wait_for_network_idle(timeout=10000)
+                except Exception:
+                    await asyncio.sleep(1.5)
+
+                # 추가: 본문에 라이브러리 결과 키워드가 나타날 때까지 폴링(최대 10s)
+                ready = False
+                for _ in range(20):  # 20 * 0.5s = 10s
+                    try:
+                        eval_result = await browser.cdp_client.send.Runtime.evaluate(
+                            params={
+                                "expression": "document.body ? document.body.innerText : ''",
+                                "returnByValue": True
+                            },
+                            session_id=browser.agent_focus.session_id
+                        )
+                        body_text = (eval_result.get("result", {}) or {}).get("value", "") or ""
+                        if any(k in body_text for k in SPA_READY_KEYWORDS):
+                            ready = True
+                            break
+                    except Exception:
+                        pass
+                    await asyncio.sleep(0.5) # 루프를 돌면서 0.5초마다 한번씩 DOM이 완성 되기를 기다린다.
+
+                print(f"[search_book LLM] SPA 로딩 대기 완료 ({'성공' if ready else '타임아웃'})")
+                
+                # 추가 대기: 검색 결과 데이터가 완전히 로드될 시간 확보 (5초)
+                if ready:
+                    print(f"[search_book LLM] 검색 결과 데이터 로딩 대기 중... (5초)")
+                    await asyncio.sleep(5)
+                
+                # page_url 추출
+                page_url = None
+                
+                if browser:
+                    try:
+                        page_url = await browser.get_current_page_url()
+                        print(f"[search_book LLM] URL: {page_url}")
+                    except Exception as e:
+                        print(f"[search_book LLM] URL 추출 실패: {e}")
+                
+                # HTML 추출 및 저장
+                saved_path = None
+                html_size = 0
+                
+                if browser and hasattr(browser, 'cdp_client') and browser.cdp_client:
+                    try:
+                        print(f"[search_book LLM] HTML 추출 시작...")
+                        result = await browser.cdp_client.send.Runtime.evaluate(
+                            params={
+                                "expression": "document.documentElement.outerHTML",
+                                "returnByValue": True
+                            },
+                            session_id=browser.agent_focus.session_id
+                        )
+                        html_content = result.get("result", {}).get("value", "")
+                        
+                        if html_content:
+                            today = datetime.now().strftime("%Y-%m-%d")
+                            timestamp = int(datetime.now().timestamp())
+                            dir_path = f"00_src/data/raw/{today}"
+                            os.makedirs(dir_path, exist_ok=True)
+                            
+                            filename = f"{place}_{timestamp}_results.html"
+                            saved_path = os.path.join(dir_path, filename)
+                            
+                            with open(saved_path, "w", encoding="utf-8") as f:
+                                f.write(html_content)
+                            
+                            # 메타데이터 사이드카 저장(.meta.json)
+                            try:
+                                meta = {
+                                    "place": place,
+                                    "page_url": page_url,
+                                    "captured_at": datetime.now().isoformat(timespec="seconds")
+                                }
+                                with open(saved_path + ".meta.json", "w", encoding="utf-8") as mf:
+                                    import json as _json
+                                    mf.write(_json.dumps(meta, ensure_ascii=False))
+                            except Exception as _e:
+                                print(f"[search_book LLM] 메타 저장 경고: {_e}")
+                            
+                            html_size = len(html_content)
+                            print(f"[search_book LLM] ✅ HTML 저장 완료: {saved_path} ({html_size:,} bytes)")
+                        else:
+                            print(f"[search_book LLM] ⚠️ HTML 내용이 비어있음")
+                            
+                    except Exception as e:
+                        print(f"[search_book LLM] ❌ HTML 추출/저장 실패: {e}")
+                        import traceback
+                        traceback.print_exc()
+                
+                # 브라우저 종료 (async 컨텍스트 내부에서)
+                if browser:
+                    try:
+                        print(f"[search_book] 브라우저 종료 중...")
+                        await browser.stop()  # BrowserSession은 close() 대신 stop() 사용
+                        print(f"[search_book] ✅ 브라우저 종료 완료")
+                    except Exception as e:
+                        print(f"[search_book] ⚠️ 브라우저 종료 경고: {e}")
+                
+                return history, page_url, saved_path, html_size
+            
+            history2, page_url, saved_html_path, html_size = asyncio.run(run_and_extract_llm())
+            
+            return {**state, "ok": True, "result_hint": "results_detected", "page_url": page_url, "saved_html_path": saved_html_path, "html_size": html_size, "used_frame": None, "markers": [], "log": [f"llm_steps={len(history2) if isinstance(history2, list) else 'unknown'}", str(e1)], "place": place}
+        except Exception as e2:
+            return {**state, "ok": False, "result_hint": "execution_error", "page_url": None, "saved_html_path": None, "html_size": 0, "used_frame": None, "markers": [], "log": ["rules_failed", str(e1), "llm_failed", str(e2)]}
