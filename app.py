@@ -467,7 +467,7 @@ def generate_map_html(user_lat: float, user_lng: float,
                 <div class="body">
                     <div class="desc">
                         <div class="ellipsis">📍 {lib['address']}</div>
-                        <div>⏱️ 이동시간: {duration_text}</div>
+                        <div>🚘 이동시간: {duration_text}</div>
                         <div>📏 이동거리: {distance_text}</div>
                         <div>⤴️ <a href='https://map.kakao.com/link/from/내위치,{user_lat},{user_lng}/to/{lib['name']},{lib['lat']},{lib['lng']}' target='_blank' class='link'>길찾기</a></div>
                     </div>
@@ -749,14 +749,13 @@ if ("address" in st.session_state and "book_name" in st.session_state and
 
         # 지도 표시 (가장 가까운 N개)
         if map_libraries:
-            st.markdown(f"### 🗺️ 가장 가까운 도서관")
+            st.markdown(f"#### 🗺️ 가장 가까운 도서관")
             map_html = generate_map_html(
                 user_lat, user_lng, map_libraries, st.session_state['book_name']
             )
             st.components.v1.html(map_html, height=570)
         
         # 전체 도서관 목록
-        st.markdown("### 🏛️ 대출 가능 도서관 목록 (가까운 순)")
         for idx, lib in enumerate(all_libraries):
             is_top = idx < TOP_N_MAP
             status_class = "available" if is_top else ""
@@ -795,12 +794,12 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                         </a>
                     </p>
                     <div style="margin-top:0.3rem; color:#4a5568; font-size:0.9rem;">
-                        ⏱️ {duration_text} · 📏 {distance_text}
+                        🚘 {duration_text} · 📏 {distance_text}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                with st.expander(f"📚 대출 가능 도서 {len(lib['books'])}권"):
+                with st.expander(f"📚 대출 가능 도서 {len(lib['books'])}권", expanded=True):
                     for book in lib['books']:
                         if book['cover_image']:
                             st.markdown(f"""
