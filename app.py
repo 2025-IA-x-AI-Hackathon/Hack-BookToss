@@ -431,6 +431,84 @@ def generate_map_html(user_lat: float, user_lng: float,
     <html>
     <head>
         <meta charset="utf-8"/>
+        <style>
+            .wrap {{
+                position: absolute;
+                left: 0;
+                bottom: 50px;
+                width: 250px;
+                margin-left: -125px;
+                text-align: left;
+                font-size: 13px;
+                font-family: 'Malgun Gothic', sans-serif;
+                line-height: 1.5;
+            }}
+            .info {{
+                width: 250px;
+                background: #fff;
+                border-radius: 10px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                overflow: hidden;
+            }}
+            .user {{
+                border-radius: 10px;
+                background: #fff;
+                width: fit-content;
+                padding: 5px 8px;
+                margin-bottom: 110px;
+                text-align: center;
+                font-size: 13px;
+                font-weight: bold;
+                font-family: 'Malgun Gothic', sans-serif;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                line-height: 1.5;
+            }}
+            .title {{
+                position: relative;
+                padding: 10px 35px 10px 15px;
+                background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                font-size: 15px;
+                font-weight: 600;
+            }}
+            .close {{
+                position: absolute;
+                top: 12px;
+                right: 12px;
+                width: 16px;
+                height: 16px;
+                background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/overlay_close.png') no-repeat;
+                background-size: 100%;
+                cursor: pointer;
+                filter: brightness(0) invert(1);
+            }}
+            .body {{
+                padding: 12px 15px;
+            }}
+            .desc {{
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }}
+            .link {{
+                color: #667eea;
+                text-decoration: none;
+                font-weight: 500;
+            }}
+            .link:hover {{
+                text-decoration: underline;
+            }}
+            .info:after {{
+                content: '';
+                position: absolute;
+                left: 50%;
+                bottom: -12px;
+                margin-left: -11px;
+                width: 22px;
+                height: 12px;
+                background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/vertex_white.png');
+            }}
+        </style>
         <script type="text/javascript"
             src="https://dapi.kakao.com/v2/maps/sdk.js?appkey={KAKAO_API_KEY}&libraries=services">
         </script>
