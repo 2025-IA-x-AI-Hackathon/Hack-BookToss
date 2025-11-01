@@ -57,6 +57,7 @@ cookies.json
 credentials.json
 token.json
 gcp-login.json
+*.mdc
 
 # ============================================================================
 # Generated Files (제외할 파일들)
@@ -87,3 +88,9 @@ TOOL_CHANGES_SUMMARY.md
 !README.md
 !TASKS.md
 !docs/docs.json
+
+# Ignore raw HTML files
+*.html
+*.html.meta.json
+
+00_src/data/

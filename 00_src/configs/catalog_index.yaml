@@ -1,0 +1,101 @@
+# 강남 3구 도서관 목록
+gangnam:
+  homepage: "https://library.gangnam.go.kr"
+  note: "강남구 통합도서관"
+
+seocho:
+  homepage: "https://public.seocholib.or.kr"
+  note: "서초구립도서관"
+
+songpa:
+  homepage: "https://www.splib.or.kr"
+  note: "송파구 통합도서관"
+
+# 미래에 서비스 할 서울시 공공 도서관 목록
+gangdong:
+  homepage: "https://www.gdlibrary.or.kr"
+  note: "강동구 통합도서관"
+
+gangbuk:
+  homepage: "https://www.gblib.or.kr"
+  note: "강북구립도서관"
+
+gangseo:
+  homepage: "https://lib.gangseo.seoul.kr"
+  note: "강서구 통합도서관"
+
+gwanak:
+  homepage: "https://lib.gwanak.go.kr"
+  note: "관악구 통합도서관"
+
+gwangjin:
+  homepage: "https://www.gwangjinlib.seoul.kr"
+  note: "광진구립도서관"
+
+guro:
+  homepage: "https://lib.guro.go.kr"
+  note: "구로구 통합도서관"
+
+geumcheon:
+  homepage: "https://geumcheonlib.seoul.kr"
+  note: "금천구립도서관"
+
+nowon:
+  homepage: "https://www.nowonlib.kr"
+  note: "노원구립도서관"
+
+dobong:
+  homepage: "https://www.unilib.dobong.kr"
+  note: "도봉구 통합도서관"
+
+dongdaemun:
+  homepage: "https://www.l4d.or.kr"
+  note: "동대문구립도서관"
+
+dongjak:
+  homepage: "https://lib.dongjak.go.kr"
+  note: "동작구 통합도서관"
+
+mapo:
+  homepage: "https://mplib.mapo.go.kr"
+  note: "마포구립도서관"
+
+seodaemun:
+  homepage: "https://lib.sdm.or.kr"
+  note: "서대문구립도서관"
+
+seongdong:
+  homepage: "https://www.sdlib.or.kr"
+  note: "성동구 통합도서관"
+
+seongbuk:
+  homepage: "https://www.sblib.seoul.kr"
+  note: "성북구립도서관"
+
+yangcheon:
+  homepage: "https://lib.yangcheon.or.kr"
+  note: "양천구 통합도서관"
+
+yeongdeungpo:
+  homepage: "https://www.ydplib.or.kr"
+  note: "영등포구립도서관"
+
+yongsan:
+  homepage: "https://www.yslibrary.or.kr"
+  note: "용산구립통합도서관"
+
+eunpyeong:
+  homepage: "https://lib.eplib.or.kr"
+  note: "은평구 공공도서관"
+
+jongno:
+  homepage: "https://lib.jongno.go.kr"
+  note: "종로구립도서관"
+
+junggu:
+  homepage: "https://www.junggulib.or.kr"
+  note: "중구구립도서관"
+
+jungnang:
+  homepage: "https://www.jungnanglib.seoul.kr"
+  note: "중랑구립도서관"
