@@ -519,12 +519,24 @@ def generate_map_html(user_lat: float, user_lng: float,
                 }});
                 
                 overlays[index] = overlay;
-                
+                overlay.setMap(map);
+
                 kakao.maps.event.addListener(marker, 'click', function() {{
                     overlay.setMap(map);
                 }});
                 
                 bounds.extend(libLatLng);
+                
+                var level = map.getLevel();
+                var offset;
+                if (level <= 3) offset = 0.001;
+                else if (level <= 5) offset = 0.002;
+                else if (level <= 7) offset = 0.005;
+                else if (level <= 9) offset = 0.007;
+                else offset = 0.01;
+
+                bounds.extend(new kakao.maps.LatLng(libLatLng.getLat() + offset, libLatLng.getLng() + offset));
+                bounds.extend(new kakao.maps.LatLng(libLatLng.getLat() + offset, libLatLng.getLng() - offset));
             }})({idx});
         """
     
