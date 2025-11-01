@@ -495,4 +495,26 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                 </div>
                 """, unsafe_allow_html=True)
                 
-                st.markdown(f"📚 대출 가능 도서 {len(lib['books'])}권")
+                with st.expander(f"📚 대출 가능 도서 {len(lib['books'])}권"):
+                    for book in lib['books']:
+                        if book['cover_image']:
+                            st.markdown(f"""
+                            <div style="display:flex; align-items:flex-start; gap:0.8rem; margin-bottom:0.8rem;">
+                                <img src="{book['cover_image']}" alt="book cover" width="90" height="120"
+                                style="border-radius:6px; object-fit:cover; flex-shrink:0;">
+                                <div>
+                                    <div style="font-weight:bold; font-size:1.2rem;">{book['title']}</div>
+                                    <div style="margin-top:0.3rem;">· 자료실: {book.get('room', 'N/A')}</div>
+                                    <div>· 청구기호: {book.get('call_number', 'N/A')}</div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"""
+                            <div style="display:flex; align-items:flex-start; gap:0.8rem; margin-bottom:0.8rem;">
+                                    <div style="font-weight:bold; font-size:1.2rem;">{book['title']}</div>
+                                    <div style="margin-top:0.3rem;">· 자료실: {book.get('room', 'N/A')}</div>
+                                    <div>· 청구기호: {book.get('call_number', 'N/A')}</div>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
