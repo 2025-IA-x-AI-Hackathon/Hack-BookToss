@@ -488,6 +488,21 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                         <span style="flex:0 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                             {lib['address']}
                         </span>
+                        <a href="https://map.kakao.com/link/from/내위치,{user_lat},{user_lng}/to/{lib['name']},{lib['lat']},{lib['lng']}" 
+                        target="_blank"
+                        title="길찾기"
+                        style="
+                            display:inline-flex;
+                            align-items:center;
+                            justify-content:center;
+                            height:1.7rem;
+                            border-radius:50%;
+                            background: none;
+                            font-size:0.8rem;
+                            flex-shrink:0;
+                        ">
+                        길찾기
+                        </a>
                     </p>
                     <div style="margin-top:0.3rem; color:#4a5568; font-size:0.9rem;">
                         ⏱️ {duration_text} · 📏 {distance_text}
