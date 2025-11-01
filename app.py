@@ -150,7 +150,7 @@ st.markdown("""
         .result-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 1.5rem;
+            padding: 1rem;
             border-radius: 12px;
             margin-bottom: 1.5rem;
         }
@@ -328,9 +328,14 @@ def get_library_with_distance(library_name: str, user_lat: float, user_lng: floa
     }
 
 
-def process_book_results(jsonl_data: str, user_lat: float, user_lng: float) -> Tuple[List[Dict], List[Dict]]:
-    """도서 검색 결과 처리 및 도서관별 거리 계산"""
+def process_book_results(
+    jsonl_data: str, user_lat: float, user_lng: float
+) -> Tuple[List[Dict], List[Dict], Optional[str]]:
+    """도서 검색 결과 처리 및 도서관별 거리 계산 (첫 번째 표지 이미지 포함)"""
     results = parse_jsonl(jsonl_data)
+    first_cover_image = next(
+        (item.get("cover_image") for item in results if item.get("cover_image")), None
+    )
 
     # 도서관별로 그룹화 (available=true만)
     available_libraries = {}
@@ -355,7 +360,7 @@ def process_book_results(jsonl_data: str, user_lat: float, user_lng: float) -> T
     # 지도용 (상위 N개)
     map_libraries = library_coords[:TOP_N_MAP]
     
-    return map_libraries, library_coords
+    return map_libraries, library_coords, first_cover_image
 
 def route_points(start_lng, start_lat, end_lng, end_lat):
     """카카오 길찾기 API로 이동 경로 및 소요 시간/거리 조회"""
@@ -715,7 +720,7 @@ if ("address" in st.session_state and "book_name" in st.session_state and
             st.stop()
 
         jsonl_data = """
-            {"title": "도서 (큰글자책) 숨결이 바람 될 때", "library": "행복한도서관", "status_raw": "대출가능", "available": true, "room": "[행복한] 큰글자책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
+            {"title": "도서 (큰글자책) 숨결이 바람 될 때", "library": "행복한도서관", "status_raw": "대출가능", "available": true, "room": "[행복한] 큰글자책", "call_number": "큰글", "year": "2018", "cover_image": "", "publisher": "도서"}
             {"title": "도서 [큰글자도서] 숨결이 바람 될 때", "library": "논현도서관", "status_raw": "대출가능", "available": true, "room": "[큰글자도서] 숨결이", "call_number": "큰", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
             {"title": "도서 숨결이 바람 될 때", "library": "논현도서관", "status_raw": "대출불가", "available": false, "room": "[큰글자도서] 숨결이", "call_number": "큰", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
             {"title": "도서 (큰글씨책) 숨결이 바람 될 때", "library": "대치도서관", "status_raw": "대출불가", "available": false, "room": "[대치] 큰글씨책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
@@ -730,7 +735,9 @@ if ("address" in st.session_state and "book_name" in st.session_state and
             {"title": "도서 숨결이 바람 될 때", "library": "대치도서관", "status_raw": "status_raw": "대출불가", "available": false, "[대치] 큰글씨책", "call_number": "큰글", "year": "2018", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}
             {"title": "도서 WHEN BREATH BECOMES", "library": "일원본동주민도서관", "status_raw": "status_raw": "대출불가", "available": false, "room": "[일원본동문고] 일반자료실", "call_number": "848-폴872w", "year": "2016", "cover_image": "https://image.aladin.co.kr/product/8992/81/cover500/8965961955_1.jpg", "publisher": "도서"}"""
         
-        map_libraries, all_libraries = process_book_results(jsonl_data, user_lat, user_lng)
+        map_libraries, all_libraries, first_cover_image = process_book_results(
+            jsonl_data, user_lat, user_lng
+        )
 
         if not all_libraries:
             st.warning("⚠️ 현재 대출 가능한 도서관을 찾을 수 없습니다.")
@@ -738,11 +745,23 @@ if ("address" in st.session_state and "book_name" in st.session_state and
             st.stop()
 
         # 결과 카드
+        st.write("")
+        with st.container(horizontal_alignment="center"):
+            if first_cover_image:
+                st.image(
+                    first_cover_image,
+                    width=200,
+                    caption=None,
+                    use_container_width=False,
+                    clamp=True,
+                    channels="RGB",
+                    output_format="auto",
+                )
         st.markdown(f"""
         <div class="result-card">
-            <h3>📖 {st.session_state['book_name']}</h3>
-            <p style="margin:0.5rem 0 0 0; opacity:0.9;">
-                📍 {user_region}에서 대출 가능한 도서관 {len(all_libraries)}곳을 찾았어요!
+            <h3 style="text-align:center;">📖 {st.session_state['book_name']}</h3>
+            <p style="margin:0.5rem 0 0 0; opacity:0.9;text-align:center;">
+                {user_region}에서 대출 가능한 도서관 {len(all_libraries)}곳을 찾았어요! 🥳
             </p>
         </div>
         """, unsafe_allow_html=True)
