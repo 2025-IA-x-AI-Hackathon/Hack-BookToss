@@ -24,6 +24,7 @@ LIBRARY_ADDRESS_MAP = {
 TIMEOUT = 5   # API 요청 타임아웃 (초)
 TOP_N_MAP = 1  # 지도에 표시할 도서관 개수
 
+
 st.set_page_config(
     page_title="Book Toss - 도서관 검색",
     page_icon="📚",
@@ -710,3 +711,12 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
+                st.write("")
+
+# 푸터 안내
+st.markdown("---")
+st.markdown("""
+<div style="text-align:center; color:#999; font-size:0.9rem; padding:1rem 0;">
+    💡 <b>TIP:</b> 지도의 도서관 마커를 클릭하면 상세 정보를 확인할 수 있어요
+</div>
+""", unsafe_allow_html=True)
