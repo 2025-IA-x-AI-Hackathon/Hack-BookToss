@@ -41,6 +41,27 @@ def calculate_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
 
     return R * c
 
+
+def format_duration(seconds: Optional[int]) -> str:
+    """초 단위 시간을 한국어로 읽기 좋은 문자열로 변환"""
+    if seconds is None:
+        return "정보 없음"
+    minutes = max(1, (int(seconds) + 59) // 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours}시간 {minutes}분" if minutes else f"{hours}시간"
+    return f"{minutes}분"
+
+
+def format_distance(route_distance_m: Optional[float], fallback_distance_km: float) -> str:
+    """경로 거리(미터)와 직선거리(km)를 기반으로 표시 문자열 생성"""
+    if route_distance_m:
+        if route_distance_m >= 1000:
+            return f"{route_distance_m / 1000:.1f} km"
+        return f"{int(route_distance_m)} m"
+    return f"{fallback_distance_km:.2f} km"
+
+
 def parse_jsonl(jsonl_text: str) -> List[Dict]:
     results = []
     for line in jsonl_text.strip().split('\n'):
@@ -91,11 +112,25 @@ def get_library_with_distance(library_name: str, user_lat: float, user_lng: floa
     lib_lng, lib_lat, _ = coords
     straight_distance_km = calculate_distance(user_lat, user_lng, lib_lat, lib_lng)
 
+    route_info = route_points(user_lng, user_lat, lib_lng, lib_lat)
+    polyline_points = None
+    route_duration = None
+    route_distance_m = None
+
+    if route_info:
+        polyline_points, route_duration, route_distance_m = route_info
+
+    distance_km = (route_distance_m / 1000) if route_distance_m else straight_distance_km
+
     return {
         "name": library_name,
         "address": address,
         "lat": lib_lat,
         "lng": lib_lng,
+        "distance": distance_km,
+        "duration": route_duration,
+        "route_distance_m": route_distance_m,
+        "polyline_points": polyline_points,
         "straight_distance": straight_distance_km,
     }
 
@@ -122,12 +157,71 @@ def process_book_results(jsonl_data: str, user_lat: float, user_lng: float) -> T
             library_coords.append(lib_info)
     
     # 거리순 정렬
-    library_coords.sort(key=lambda x: x["straight_distance"])
+    library_coords.sort(key=lambda x: x["distance"])
 
     # 지도용 (상위 N개)
     map_libraries = library_coords[:TOP_N_MAP]
     
     return map_libraries, library_coords
+
+def route_points(start_lng, start_lat, end_lng, end_lat):
+    """카카오 길찾기 API로 이동 경로 및 소요 시간/거리 조회"""
+    url = "https://apis-navi.kakaomobility.com/v1/directions"
+    params = {
+        "origin": f"{start_lng},{start_lat}",
+        "destination": f"{end_lng},{end_lat}"
+    }
+
+    def _show_route_warning():
+        if not st.session_state.get("_route_warning_shown"):
+            st.warning("길찾기 정보를 불러오지 못해 직선거리로 대체합니다.")
+            st.session_state["_route_warning_shown"] = True
+
+    try:
+        res = requests.get(url, headers=HEADERS, params=params, timeout=TIMEOUT)
+        res.raise_for_status()
+    except requests.RequestException as exc:
+        _show_route_warning()
+        print(f"[route_points] request error: {exc}")
+        return None
+
+    data = res.json()
+    routes = data.get("routes", [])
+
+    if not routes:
+        _show_route_warning()
+        return None
+
+    route = routes[0]
+    result_code = route.get("result_code", 0)
+    if result_code != 0:
+        _show_route_warning()
+        return None
+
+    summary = route.get("summary", {})
+
+    # 도로 좌표 추출
+    coords = []
+    for section in route.get("sections", []):
+        for road in section.get("roads", []):
+            coords.extend(road.get("vertexes", []))
+
+    if not coords:
+        _show_route_warning()
+        return None
+
+    # vertexes는 [x1, y1, x2, y2, ...] 형태이므로 2개씩 묶기
+    path = [(coords[i], coords[i + 1]) for i in range(0, len(coords), 2)]
+
+    # 자바스크립트 코드로 경로 표시
+    polyline_points = ",\n".join(
+        [f"new kakao.maps.LatLng({y}, {x})" for x, y in path]
+    )
+
+    duration = summary.get("duration")
+    distance = summary.get("distance")
+
+    return polyline_points, duration, distance
 
 def generate_map_html(user_lat: float, user_lng: float, 
                      library_coords: List[Dict], book_name: str) -> str:
@@ -163,6 +257,13 @@ def generate_map_html(user_lat: float, user_lng: float,
     """
     
     for idx, lib in enumerate(library_coords):
+
+        duration_text = format_duration(lib.get("duration"))
+        distance_text = format_distance(
+            lib.get("route_distance_m"),
+            lib.get("straight_distance", lib["distance"])
+        )
+
         info_html = f"""
         <div class="wrap">
             <div class="info">
@@ -173,6 +274,8 @@ def generate_map_html(user_lat: float, user_lng: float,
                 <div class="body">
                     <div class="desc">
                         <div class="ellipsis">📍 {lib['address']}</div>
+                        <div>⏱️ 이동시간: {duration_text}</div>
+                        <div>📏 이동거리: {distance_text}</div>
                         <div>⤴️ <a href='https://map.kakao.com/link/from/내위치,{user_lat},{user_lng}/to/{lib['name']},{lib['lat']},{lib['lng']}' target='_blank' class='link'>길찾기</a></div>
                     </div>
                 </div>
@@ -180,6 +283,23 @@ def generate_map_html(user_lat: float, user_lng: float,
         </div>
         """
 
+        polyline_js = ""
+        if lib.get("polyline_points"):
+            polyline_js = f"""
+                var linePath = [
+                    {lib['polyline_points']}
+                ];
+
+                var polyline = new kakao.maps.Polyline({{
+                    path: linePath,
+                    strokeWeight: 5,
+                    strokeColor: '#0078ff',
+                    strokeOpacity: 0.9,
+                    strokeStyle: 'solid'
+                }});
+                polyline.setMap(map);
+            """
+        
         markers_js += f"""
             (function(index) {{
                 var libLatLng = new kakao.maps.LatLng({lib['lat']}, {lib['lng']});
@@ -188,6 +308,9 @@ def generate_map_html(user_lat: float, user_lng: float,
                     map: map
                 }});
 
+                // 경로 라인
+                {polyline_js}
+                
                 var overlay = new kakao.maps.CustomOverlay({{
                     content: `{info_html}`,
                     map: null,
@@ -347,13 +470,19 @@ if ("address" in st.session_state and "book_name" in st.session_state and
         for idx, lib in enumerate(all_libraries):
             is_top = idx < TOP_N_MAP
             status_class = "available" if is_top else ""
-            distance_text = lib.get("straight_distance", lib["straight_distance"])
-
+            duration_text = format_duration(lib.get("duration"))
+            distance_text = format_distance(
+                lib.get("route_distance_m"),
+                lib.get("straight_distance", lib["distance"])
+            )
+            distance_badge = f"{duration_text}"
+            
             with st.container():
                 st.markdown(f"""
                 <div class="library-item {status_class}">
                     <h4>
                         {'🥇' if idx == 0 else '🥈' if idx == 1 else ''} {lib['name']}
+                        <span class="distance-badge">{distance_badge}</span>
                     </h4>
                     <p style="margin:0 0; display:flex; align-items:center; gap:0.4rem;">
                         <span style="flex:0 1 auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
@@ -361,7 +490,7 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                         </span>
                     </p>
                     <div style="margin-top:0.3rem; color:#4a5568; font-size:0.9rem;">
-                        📏 {distance_text}
+                        ⏱️ {duration_text} · 📏 {distance_text}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
