@@ -5,14 +5,17 @@ from typing import List, Dict, Optional, Tuple
 import requests
 from dotenv import load_dotenv
 from math import radians, sin, cos, sqrt, atan2
+import urllib
+
+# ============================================================================
+# 설정 및 상수
+# ============================================================================
 
 load_dotenv()
 
 KAKAO_REST_KEY = os.getenv("KAKAO_REST_KEY")
 KAKAO_API_KEY = os.getenv("KAKAO_API_KEY")
-
 HEADERS = {"Authorization": f"KakaoAK {KAKAO_REST_KEY}"}
-
 ALLOWED_REGION = ["강남구", "서초구", "송파구"]
 
 LIBRARY_ADDRESS_MAP = {
@@ -24,6 +27,9 @@ LIBRARY_ADDRESS_MAP = {
 TIMEOUT = 5   # API 요청 타임아웃 (초)
 TOP_N_MAP = 1  # 지도에 표시할 도서관 개수
 
+# ============================================================================
+# 페이지 설정
+# ============================================================================
 
 st.set_page_config(
     page_title="Book Toss - 도서관 검색",
@@ -32,98 +38,101 @@ st.set_page_config(
 
 # 커스텀 CSS
 st.markdown("""
-<style>
-    .main-header {
-        text-align: center;
-        padding: 2rem 0 1rem 0;
-    }
-    .main-title {
-        font-size: 3rem;
-        font-weight: 700;
-        background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0.5rem;
-    }
-    .subtitle {
-        font-size: 1.2rem;
-        color: #666;
-        margin-bottom: 2rem;
-    }
-    .search-card {
-        background: white;
-        padding: 2rem;
-        border-radius: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
-        margin-bottom: 2rem;
-    }
-    .result-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        margin-bottom: 1.5rem;
-    }
-    .info-box {
-        background: #f8f9fa;
-        border-left: 4px solid #667eea;
-        padding: 1rem;
-        border-radius: 6px;
-        margin: 1rem 0;
-    }
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        font-weight: 600;
-        vertical-align: top;
-        padding: 0.5rem;
-        border-radius: 10px;
-        border: none;
-        font-size: 1.1rem;
-    }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(102,126,234,0.3);
-    }
-    .library-item {
-        background: rgb(190 190 190 / 20%);
-        border-radius: 10px;
-        padding: 1rem;
-        margin-bottom: 0.6rem;
-    }
-    .library-item.available {
-        background: rgb(204 204 255/ 40%);
-    }
-    .distance-badge {
-        display: inline-block;
-        background: #667eea;
-        color: white;
-        padding: 0.3rem 0.8rem;
-        margin: 0 0.3rem;
-        vertical-align: 3px;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-    .status-badge {
-        display: inline-block;
-        padding: 0.3rem 0.8rem;
-        border-radius: 20px;
-        font-size: 0.85rem;
-        font-weight: 600;
-    }
-    .status-available {
-        background: #d4edda;
-        color: #155724;
-    }
-    .status-unavailable {
-        background: #f8d7da;
-        color: #721c24;
-    }
-</style>
-""", unsafe_allow_html=True)
+    <style>
+        .main-header {
+            text-align: center;
+            padding: 2rem 0 1rem 0;
+        }
+        .main-title {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            color: #666;
+            margin-bottom: 2rem;
+        }
+        .search-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+            margin-bottom: 2rem;
+        }
+        .result-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+        .info-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 1rem;
+            border-radius: 6px;
+            margin: 1rem 0;
+        }
+        .stButton>button {
+            width: 100%;
+            background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            vertical-align: top;
+            padding: 0.5rem;
+            border-radius: 10px;
+            border: none;
+            font-size: 1.1rem;
+        }
+        .stButton>button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(102,126,234,0.3);
+        }
+        .library-item {
+            background: rgb(190 190 190 / 20%);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 0.6rem;
+        }
+        .library-item.available {
+            background: rgb(204 204 255/ 40%);
+        }
+        .distance-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 0.3rem 0.8rem;
+            margin: 0 0.3rem;
+            vertical-align: 3px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-available {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-unavailable {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
+# ============================================================================
+# 유틸리티 함수
+# ============================================================================
 
 def calculate_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
     """두 좌표 간 거리 계산 (Haversine 공식, km 단위)"""
@@ -537,6 +546,10 @@ def generate_map_html(user_lat: float, user_lng: float,
     </body>
     </html>
     """
+
+# ============================================================================
+# UI 렌더링
+# ============================================================================
 
 # 헤더
 st.markdown("""
