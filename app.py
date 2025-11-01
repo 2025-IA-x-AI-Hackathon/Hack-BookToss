@@ -669,7 +669,7 @@ def show_library_search_button(book_name: str, user_region: str):
             st.link_button(
                 f"🔗 {region} 통합도서관에서 직접 검색하기",
                 url,
-                use_container_width=True
+                width='stretch'
             )
             break  # 찾으면 반복 종료
 
@@ -770,7 +770,6 @@ if ("address" in st.session_state and "book_name" in st.session_state and
                     first_cover_image,
                     width=200,
                     caption=None,
-                    use_container_width=False,
                     clamp=True,
                     channels="RGB",
                     output_format="auto",
